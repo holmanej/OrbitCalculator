@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -11,13 +12,54 @@ namespace OrbitCalculator
     {
         double Mu;
         public double a;
+        public double b;
         public double e;
+        public double Ra;
+        public double Rp;
+        public double T;
+        public int tCurrent;
 
-        public Orbit(double[] velocity, double[] position, double mass)
+        public class PathData
+        {
+            public double E { get; set; }
+            public double Distance { get; set; }
+            public double Velocity { get; set; }
+
+            public PathData(double e, double r, double v)
+            {
+                E = e;
+                Distance = r;
+                Velocity = v;
+            }
+        }
+
+        public List<PathData> Path;
+
+        public Orbit(double velocity, double period, double mass)
         {
             Mu = mass * 6.674e-11;
-            a = Geta(Mu, velocity, position);
-            e = Gete(Mu, velocity, position);
+            a = Geta(period, velocity);
+            e = Gete(Mu, new double[] { 0, velocity, 0 }, new double[] { a, 0, 0 } );
+            b = Getb(a, e);
+            Ra = GetRa();
+            Rp = GetRp();
+            T = GetT();
+            Path = CompleteOrbit();
+        }
+
+        private List<PathData> CompleteOrbit()
+        {
+            List<PathData> orbitData = new List<PathData>();
+            tCurrent = 0;
+            double E = 0;
+            for (int i = 0; i <= GetT(); i += 60)
+            {
+                E -= (E - e * Math.Sin(E) - i * Math.Sqrt(Mu / Math.Pow(a, 3))) / (1 - e * Math.Cos(E));
+                double r = a * (1 - Math.Pow(e, 2)) / (1 + e * ((Math.Cos(E) - e) / (1 - e * Math.Cos(E))));
+                double v = Math.Sqrt(Mu * (2 / r - 1 / a));
+                orbitData.Add(new PathData(E, r, v));
+            }
+            return orbitData;
         }
 
         public double GetE(int t)
@@ -42,28 +84,28 @@ namespace OrbitCalculator
             return Math.Sqrt(Mu * (2 / r - 1 / a));
         }
 
-        public double GetRp()
+        private double GetRp()
         {
             return a * (1 - e);
         }
 
-        public double GetRa()
+        private double GetRa()
         {
             return a * (1 + e);
         }
 
-        public double GetT()
+        private double GetT()
         {
             return (2 * Math.PI * Math.Sqrt(Math.Pow(a, 3) / Mu));
         }
 
-        static double Magnitude(double[] v)
+        private double Magnitude(double[] v)
         {
             double m = Math.Sqrt(Math.Pow(v[0], 2) + Math.Pow(v[1], 2) + Math.Pow(v[2], 2));
             return m;
         }
 
-        static double Gete(double mu, double[] v, double[] r)
+        private double Gete(double mu, double[] v, double[] r)
         {
             double temp1 = Math.Pow(Magnitude(v), 2) - mu / Magnitude(r);
             double temp2 = v[0] * r[0] + v[1] * r[1] + v[2] * r[2];
@@ -71,10 +113,23 @@ namespace OrbitCalculator
             return Magnitude(eVec);
         }
 
-        static double Geta(double mu, double[] v, double[] r)
+        private double Getb(double a, double e)
         {
-            double E = (Math.Pow(Magnitude(v), 2) / 2) - (mu / Magnitude(r));
-            return -mu / (2 * E);
+            return Math.Sqrt(Math.Pow(a, 2) * (1 - Math.Pow(e, 2)));
+        }
+
+        private double Geta(double period, double velocity)
+        {
+            double temp = period / 6.28;
+            temp = Math.Pow(temp, 2);
+            temp *= Mu;
+            temp = Math.Pow(temp, (double)1 / 3);
+            temp *= (-2 / Mu);
+            temp = 1 / temp;
+            temp = (Math.Pow(velocity, 2) / 2) - temp;
+            temp = 1 / temp;
+            temp *= Mu;
+            return temp;
         }
     }
 }
